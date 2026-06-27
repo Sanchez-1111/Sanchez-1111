@@ -1,0 +1,6 @@
+{
+  "name": "Pocket Motivation Generator",
+  "description": "A beautifully styled, mobile-optimized pocket motivation applet that generates personalized quotes, lets you save favorites, and share inspiration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
