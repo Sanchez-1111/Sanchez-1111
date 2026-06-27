@@ -25,7 +25,9 @@ import {
   Info,
   Calendar,
   Sparkle,
-  Database
+  Database,
+  Smartphone,
+  QrCode
 } from 'lucide-react';
 import { Quote, MoodType, CategoryType } from './types';
 import { fallbackQuotes, moodConfigs, categoryConfigs } from './data/fallbackQuotes';
