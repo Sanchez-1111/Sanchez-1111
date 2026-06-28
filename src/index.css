@@ -1,34 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Inter:wght@300;400;500;600;700&family=Cinzel:wght@500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", sans-serif;
+  --font-display: "Lora", Georgia, serif;
+  --font-classic-heading: "Cinzel", serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-/* Custom glassmorphism and subtle animations */
-.glass {
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Classic Paper Style / Vignette & Subtle Lines */
+.classic-border {
+  border: 1px solid #E6DEC9;
 }
 
-.glass-light {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+.classic-double-border {
+  border: 4px double #C4B295;
 }
 
-.iphone-bezel {
-  box-shadow: 0 0 0 10px #1e293b, 0 20px 50px rgba(0, 0, 0, 0.6);
+.classic-shadow {
+  box-shadow: 0 4px 20px -2px rgba(45, 40, 36, 0.08), 0 2px 6px -1px rgba(45, 40, 36, 0.04);
 }
 
-/* Styled scrollbars */
+.classic-btn {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.classic-btn:hover {
+  transform: translateY(-1px);
+}
+
+.classic-btn:active {
+  transform: translateY(0);
+}
+
+/* Scrollbars - Elegant & Muted */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -36,11 +44,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(140, 130, 118, 0.2);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(140, 130, 118, 0.4);
 }
-

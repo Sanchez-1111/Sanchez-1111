@@ -27,16 +27,29 @@ import {
   Sparkle,
   Database,
   Smartphone,
-  QrCode
+  QrCode,
+  TrendingUp,
+  Activity
 } from 'lucide-react';
 import { Quote, MoodType, CategoryType } from './types';
 import { fallbackQuotes, moodConfigs, categoryConfigs } from './data/fallbackQuotes';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Cell,
+  PieChart,
+  Pie
+} from 'recharts';
 
 export default function App() {
   // Navigation & tabs
-  const [activeTab, setActiveTab] = useState<'home' | 'library' | 'create' | 'database'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'library' | 'create' | 'stats'>('home');
 
-  // Supabase Integration state
+  // Supabase Integration state (disabled for local only mode)
   const [supabaseUrl, setSupabaseUrl] = useState('https://vjanavkcawdkzrazmlwx.supabase.co');
   const [supabaseAnonKey, setSupabaseAnonKey] = useState('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqYW5hdmtjYXdka3pyYXptbHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Njk5NTgsImV4cCI6MjA5ODA0NTk1OH0.ppgcMMt2xd4_afAIKaPBXp6prxPSz27xteli9vNb2M4');
   const [isSupabaseLoading, setIsSupabaseLoading] = useState(false);
@@ -58,6 +71,9 @@ export default function App() {
   const [customAuthor, setCustomAuthor] = useState('');
   const [customCategory, setCustomCategory] = useState<CategoryType>('general');
 
+  // Generated Quote history & statistics
+  const [generatedHistory, setGeneratedHistory] = useState<Quote[]>([]);
+
   // UI status states
   const [showExplanation, setShowExplanation] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
@@ -75,6 +91,18 @@ export default function App() {
       } catch (e) {
         console.error('Error parsing stored favorites', e);
       }
+    }
+
+    // Load generated quote history from local storage
+    const storedHistory = localStorage.getItem('pocket_motivation_generated_history');
+    if (storedHistory) {
+      try {
+        setGeneratedHistory(JSON.parse(storedHistory));
+      } catch (e) {
+        console.error('Error parsing stored history', e);
+      }
+    } else {
+      setGeneratedHistory([]);
     }
 
     // Load streak & daily info
@@ -105,15 +133,6 @@ export default function App() {
     // Select initial random fallback quote
     const initialQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
     setCurrentQuote({ ...initialQuote, id: `fb-init-${Date.now()}` });
-
-    // Load Supabase credentials and initialize if present
-    const savedUrl = localStorage.getItem('pocket_supabase_url') || 'https://vjanavkcawdkzrazmlwx.supabase.co';
-    const savedKey = localStorage.getItem('pocket_supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqYW5hdmtjYXdka3pyYXptbHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Njk5NTgsImV4cCI6MjA5ODA0NTk1OH0.ppgcMMt2xd4_afAIKaPBXp6prxPSz27xteli9vNb2M4';
-    if (savedUrl && savedKey) {
-      setSupabaseUrl(savedUrl);
-      setSupabaseAnonKey(savedKey);
-      testAndConnectSupabase(savedUrl, savedKey, false);
-    }
   }, []);
 
   // Sync Supabase function
@@ -285,6 +304,17 @@ export default function App() {
       const quoteData: Quote = await response.json();
       setCurrentQuote(quoteData);
 
+      // Save to tracking history
+      const newGeneratedQuote: Quote = {
+        ...quoteData,
+        timestamp: Date.now()
+      };
+      setGeneratedHistory(prev => {
+        const next = [newGeneratedQuote, ...prev];
+        localStorage.setItem('pocket_motivation_generated_history', JSON.stringify(next));
+        return next;
+      });
+
       // Manage generation streak
       const todayDate = new Date().toDateString();
       const lastGenStr = localStorage.getItem('pocket_motivation_last_gen');
@@ -322,10 +352,20 @@ export default function App() {
       const pool = matched.length > 0 ? matched : sourcePool;
       const fallbackSelected = pool[Math.floor(Math.random() * pool.length)];
       
-      setCurrentQuote({
+      const newGeneratedQuote: Quote = {
         ...fallbackSelected,
         id: `fb-fallback-${Date.now()}`,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        mood: selectedMood,
+        category: selectedCategory
+      };
+      setCurrentQuote(newGeneratedQuote);
+
+      // Save to tracking history
+      setGeneratedHistory(prev => {
+        const next = [newGeneratedQuote, ...prev];
+        localStorage.setItem('pocket_motivation_generated_history', JSON.stringify(next));
+        return next;
       });
       triggerToast('Chosen from curated pocket archives.');
     } finally {
@@ -427,90 +467,134 @@ export default function App() {
     }
   };
 
+  // Filter history to last 30 days
+  const last30DaysQuotes = generatedHistory.filter(q => {
+    const qTime = q.timestamp || Date.now();
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return qTime >= thirtyDaysAgo;
+  });
+
+  // Mood calculations
+  const moodCounts = moodConfigs.reduce((acc, config) => {
+    acc[config.id] = 0;
+    return acc;
+  }, {} as Record<string, number>);
+
+  last30DaysQuotes.forEach(q => {
+    const mood = (q.mood || 'general') as MoodType;
+    if (moodCounts[mood] !== undefined) {
+      moodCounts[mood]++;
+    } else {
+      moodCounts['general']++;
+    }
+  });
+
+  // Calculate top mood
+  let topMoodId: MoodType = 'general';
+  let maxMoodCount = -1;
+  Object.entries(moodCounts).forEach(([m, val]) => {
+    if (val > maxMoodCount) {
+      maxMoodCount = val;
+      topMoodId = m as MoodType;
+    }
+  });
+  const topMoodConfig = moodConfigs.find(m => m.id === topMoodId) || moodConfigs[5];
+
+  // Category calculations
+  const categoryCounts = categoryConfigs.reduce((acc, config) => {
+    acc[config.id] = 0;
+    return acc;
+  }, {} as Record<string, number>);
+
+  last30DaysQuotes.forEach(q => {
+    const cat = (q.category || 'general') as CategoryType;
+    if (categoryCounts[cat] !== undefined) {
+      categoryCounts[cat]++;
+    } else {
+      categoryCounts['general']++;
+    }
+  });
+
+  // Calculate top category
+  let topCategoryId: CategoryType = 'general';
+  let maxCatCount = -1;
+  Object.entries(categoryCounts).forEach(([c, val]) => {
+    if (val > maxCatCount) {
+      maxCatCount = val;
+      topCategoryId = c as CategoryType;
+    }
+  });
+  const topCategoryConfig = categoryConfigs.find(c => c.id === topCategoryId) || categoryConfigs[0];
+
+  // Recharts Chart Data
+  const moodChartData = moodConfigs.map(config => ({
+    name: config.label,
+    value: moodCounts[config.id] || 0,
+    color: config.color,
+    emoji: config.emoji
+  })).filter(item => item.value > 0);
+
+  const categoryChartData = categoryConfigs.map(config => ({
+    name: config.label,
+    shortName: config.label.split(' ')[0],
+    value: categoryCounts[config.id] || 0,
+    color: config.color
+  }));
+
   const activeCategoryConfig = categoryConfigs.find(c => c.id === selectedCategory);
   const activeMoodConfig = moodConfigs.find(m => m.id === selectedMood);
 
   return (
-    <div className="w-full min-h-screen bg-[#060814] flex items-center justify-center font-sans overflow-x-hidden p-4 md:p-8 relative">
-      {/* Mesh Ambient Orbs (Frosted Theme Backgrounds) */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full mix-blend-screen filter blur-[120px] pointer-events-none animate-pulse duration-10000"></div>
-      <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-fuchsia-600/20 rounded-full mix-blend-screen filter blur-[120px] pointer-events-none animate-pulse duration-[8000ms]"></div>
-      <div className="absolute top-[30%] right-[10%] w-[350px] h-[350px] bg-cyan-500/15 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none"></div>
+    <div className="w-full h-screen sm:h-auto sm:min-h-screen bg-[#F4EFE6] flex items-center justify-center font-sans overflow-hidden sm:overflow-x-hidden sm:p-4 md:p-8 relative">
+      {/* Decorative Warm Vignette shadow */}
+      <div className="absolute inset-0 bg-radial-[rgba(252,250,242,0)_40%,rgba(140,120,95,0.06)_100%] pointer-events-none"></div>
 
       {/* Main Grid: Responsive layout containing both mock device and active details */}
-      <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center justify-center relative z-10">
+      <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center justify-center relative z-10 h-full sm:h-auto">
         
         {/* Left Side: Aesthetic and explanatory details for desktop layouts */}
         <div className="hidden lg:flex flex-col col-span-5 space-y-6 pr-6">
-          <div className="border-l-[3px] border-fuchsia-500 pl-4 space-y-1">
-            <span className="text-fuchsia-400 text-xs font-bold uppercase tracking-widest font-display block">Aesthetic Concept</span>
-            <h2 className="text-white text-3xl font-extrabold font-display leading-tight">Frosted Glass UI</h2>
-            <p className="text-slate-400 text-sm">
-              An elegant, distraction-free environment utilizing high-transparency glass surfaces, fluid organic colors, and precise typography spacing.
+          <div className="border-l-[3px] border-[#8F2A19] pl-4 space-y-1">
+            <span className="text-[#8F2A19] text-xs font-bold uppercase tracking-widest font-sans block">Aesthetic Concept</span>
+            <h2 className="text-[#2D2824] text-3xl font-extrabold font-classic-heading leading-tight">Classic Library</h2>
+            <p className="text-[#615A52] text-sm">
+              A timeless, distraction-free workspace styled with warm parchment papers, delicate book borders, and elegant serif typography to calm your mind and focus your intent.
             </p>
           </div>
 
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 space-y-4">
+          <div className="bg-[#FCFAF2] rounded-2xl p-5 border border-[#E6DEC9] classic-shadow space-y-4">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-300">
-                <Flame className="w-4 h-4 animate-bounce" />
+              <div className="w-8 h-8 rounded-lg bg-[#8F2A19]/15 flex items-center justify-center text-[#8F2A19]">
+                <Flame className="w-4 h-4 animate-bounce text-[#C59B27] fill-[#C59B27]" />
               </div>
               <div>
-                <span className="text-xs text-slate-400 font-semibold block uppercase tracking-wider">Current Streak</span>
-                <span className="text-lg font-bold text-white font-display">{streakCount} Days Motivated</span>
+                <span className="text-xs text-[#615A52] font-semibold block uppercase tracking-wider">Current Streak</span>
+                <span className="text-lg font-bold text-[#2D2824] font-display">{streakCount} Days Motivated</span>
               </div>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-[#615A52] leading-relaxed">
               Pocket Motivation is designed to make intentional reflection a daily habit. Generate quotes matching your current mood and watch your momentum burn brighter.
             </p>
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white/5 border border-white/5 p-4 rounded-xl">
-              <span className="text-[10px] uppercase text-indigo-400 font-bold block tracking-wider mb-1">AI Engine</span>
-              <span className="text-white text-xs font-medium font-mono">Gemini-3.5-Flash</span>
-            </div>
-            <div className="bg-white/5 border border-white/5 p-4 rounded-xl">
-              <span className="text-[10px] uppercase text-fuchsia-400 font-bold block tracking-wider mb-1">Mode</span>
-              <span className="text-white text-xs font-medium font-mono">Fully Client Proxy</span>
-            </div>
-          </div>
         </div>
 
-        {/* Right Side: Smartphone Device Mockup (375px wide, beautiful glass panel) */}
-        <div className="col-span-1 lg:col-span-7 flex justify-center w-full">
+        {/* Right Side: Smartphone Device Mockup */}
+        <div className="col-span-1 lg:col-span-7 flex justify-center w-full h-full sm:h-auto">
           
-          <div className="relative w-full max-w-[395px] h-[780px] bg-white/[0.08] backdrop-blur-3xl rounded-[44px] border border-white/20 shadow-2xl flex flex-col overflow-hidden iphone-bezel animate-[fadeIn_0.5s_ease-out]">
+          <div className="relative w-full max-w-full sm:max-w-[395px] h-screen sm:h-[780px] bg-[#FDFBF7] rounded-none sm:rounded-[44px] border-none sm:border sm:border-[#C4B295] shadow-none sm:classic-shadow flex flex-col overflow-hidden animate-[fadeIn_0.5s_ease-out]">
             
-            {/* Status Bar / Top Notch Simulation */}
-            <div className="flex justify-between items-center px-8 pt-6 pb-2 text-white/90 text-xs font-semibold relative z-20">
-              <span className="font-display">9:41</span>
-              {/* Dynamic device pill */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#060814] rounded-b-2xl border-x border-b border-white/10 flex items-center justify-center">
-                <div className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-white/5 mr-2"></div>
-                <div className="w-10 h-1 bg-white/20 rounded-full"></div>
-              </div>
-              <div className="flex space-x-1.5 items-center">
-                <span className="text-[9px] font-mono text-fuchsia-400 bg-fuchsia-500/10 px-1.5 py-0.5 rounded border border-fuchsia-500/20 flex items-center gap-1">
-                  <span className="w-1 h-1 rounded-full bg-fuchsia-400 animate-pulse"></span>
-                  LIVE
-                </span>
-                <span className="text-white/60">⚡</span>
-              </div>
-            </div>
-
             {/* Header Area */}
-            <div className="px-7 pt-4 pb-3 flex justify-between items-center border-b border-white/10 relative z-20 bg-white/[0.02]">
+            <div className="px-7 pt-6 sm:pt-5 pb-4 flex justify-between items-center border-b border-[#E6DEC9] relative z-20 bg-[#F8F5EE]">
               <div>
-                <h1 className="text-white text-lg font-bold tracking-tight font-display">Pocket Motive</h1>
-                <p className="text-white/50 text-[9px] uppercase tracking-widest font-semibold">Daily Inspiration</p>
+                <h1 className="text-[#2D2824] text-lg font-bold tracking-widest font-classic-heading">Pocket Motive</h1>
+                <p className="text-[#8C8276] text-[9px] uppercase tracking-widest font-semibold font-sans">Daily Inspiration</p>
               </div>
               
-              {/* Daily Streak Counter with Glow */}
-              <div className="flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/10 shadow-inner">
-                <Flame className="w-4 h-4 text-amber-500 fill-amber-500 animate-pulse" />
-                <span className="text-white font-bold text-xs font-mono">{streakCount}d</span>
+              {/* Daily Streak Counter */}
+              <div className="flex items-center space-x-2 bg-[#F3EFE3] px-3 py-1.5 rounded-full border border-[#D6CDB5]">
+                <Flame className="w-4 h-4 text-[#C59B27] fill-[#C59B27]" />
+                <span className="text-[#2D2824] font-bold text-xs font-mono">{streakCount}d</span>
               </div>
             </div>
 
@@ -521,20 +605,18 @@ export default function App() {
               {activeTab === 'home' && (
                 <div className="space-y-5">
                   {/* Active Quote Display Area */}
-                  <div className="relative bg-white/[0.04] rounded-3xl p-6 border border-white/10 shadow-lg min-h-[280px] flex flex-col justify-between overflow-hidden group">
-                    <div className="absolute -top-12 -right-12 w-28 h-28 bg-fuchsia-500/10 rounded-full blur-2xl group-hover:bg-fuchsia-500/25 transition-all"></div>
-                    <div className="absolute -bottom-12 -left-12 w-28 h-28 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/25 transition-all"></div>
+                  <div className="relative bg-[#FCFAF3] rounded-3xl p-6 border-4 border-double border-[#C4B295] classic-shadow min-h-[280px] flex flex-col justify-between overflow-hidden group">
                     
                     {/* Top Quote Icon and category chip */}
                     <div className="flex justify-between items-center relative z-10">
-                      <span className="text-4xl text-fuchsia-400/30 font-serif select-none">“</span>
+                      <span className="text-4xl text-[#8F2A19]/25 font-serif select-none">“</span>
                       {currentQuote && (
                         <div className="flex space-x-1">
-                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5 text-slate-300 border border-white/10">
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#F5F2EB] text-[#615A52] border border-[#E6DEC9]">
                             {currentQuote.category}
                           </span>
                           {currentQuote.mood && currentQuote.mood !== 'general' && (
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#8F2A19]/10 text-[#8F2A19] border border-[#8F2A19]/20">
                               {currentQuote.mood}
                             </span>
                           )}
@@ -546,37 +628,37 @@ export default function App() {
                     <div className="my-5 flex-1 flex flex-col justify-center relative z-10">
                       {isLoading ? (
                         <div className="space-y-3 py-4">
-                          <div className="h-4 bg-white/10 rounded-md w-full animate-pulse"></div>
-                          <div className="h-4 bg-white/10 rounded-md w-11/12 animate-pulse"></div>
-                          <div className="h-4 bg-white/10 rounded-md w-4/5 animate-pulse"></div>
+                          <div className="h-4 bg-stone-200/60 rounded-md w-full animate-pulse"></div>
+                          <div className="h-4 bg-stone-200/60 rounded-md w-11/12 animate-pulse"></div>
+                          <div className="h-4 bg-stone-200/60 rounded-md w-4/5 animate-pulse"></div>
                         </div>
                       ) : currentQuote ? (
                         <div className="space-y-4 animate-[fadeIn_0.3s_ease-out]">
-                          <p className="text-white text-xl md:text-2xl font-medium leading-relaxed italic font-display">
+                          <p className="text-[#2D2824] text-xl md:text-2xl font-serif font-display leading-relaxed italic">
                             {currentQuote.text}
                           </p>
-                          <p className="text-fuchsia-400 font-bold tracking-widest text-xs uppercase text-right">
+                          <p className="text-[#8F2A19] font-bold tracking-widest text-xs uppercase text-right">
                             — {currentQuote.author}
                           </p>
                         </div>
                       ) : (
-                        <p className="text-slate-400 text-center text-sm py-8">Select criteria below to generate your customized pocket motivation.</p>
+                        <p className="text-[#615A52] text-center text-sm py-8">Select criteria below to generate your customized pocket motivation.</p>
                       )}
                     </div>
 
                     {/* Interactive explanation/coaching toggle */}
                     {currentQuote?.explanation && !isLoading && (
-                      <div className="border-t border-white/5 pt-4 flex justify-between items-center relative z-10">
+                      <div className="border-t border-[#E6DEC9] pt-4 flex justify-between items-center relative z-10">
                         <button 
                           onClick={() => setShowExplanation(!showExplanation)}
-                          className="flex items-center space-x-1.5 text-xs text-slate-300 hover:text-white transition-all bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-lg border border-white/10"
+                          className="flex items-center space-x-1.5 text-xs text-[#2D2824] hover:text-[#8F2A19] transition-all bg-[#F5F2EB] hover:bg-[#EAE3D2] px-2.5 py-1 rounded-lg border border-[#E6DEC9]"
                         >
                           <Info className="w-3.5 h-3.5" />
                           <span>{showExplanation ? 'Hide Coaching Guide' : 'Read Deep Coaching'}</span>
                         </button>
                         
                         {currentQuote.isCustom && (
-                          <span className="text-[9px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25">
+                          <span className="text-[9px] text-[#3A5F43] bg-[#3A5F43]/10 px-2 py-0.5 rounded-full border border-[#3A5F43]/20">
                             Custom Authored
                           </span>
                         )}
@@ -586,25 +668,25 @@ export default function App() {
 
                   {/* Animated explanation slide-down */}
                   {showExplanation && currentQuote?.explanation && !isLoading && (
-                    <div className="bg-indigo-500/10 rounded-2xl p-4 border border-indigo-500/25 animate-[slideDown_0.25s_ease-out] text-slate-200 text-xs leading-relaxed space-y-1 relative">
-                      <p className="font-semibold text-indigo-300 uppercase tracking-widest text-[9px] mb-1">Perspective & Guidance</p>
+                    <div className="bg-[#F3EFE3] rounded-2xl p-4 border border-[#D6CDB5] animate-[slideDown_0.25s_ease-out] text-[#2D2824] text-xs leading-relaxed space-y-1 relative">
+                      <p className="font-semibold text-[#8F2A19] uppercase tracking-widest text-[9px] mb-1">Perspective & Guidance</p>
                       <p>{currentQuote.explanation}</p>
                     </div>
                   )}
 
                   {/* Generation customization controls */}
-                  <div className="bg-white/[0.03] rounded-3xl p-5 border border-white/5 space-y-4">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                      <div className="flex items-center space-x-1.5 text-slate-200">
-                        <Sliders className="w-4 h-4 text-indigo-400" />
-                        <span className="text-xs font-bold tracking-wider uppercase font-display">Refine Topic & Mind</span>
+                  <div className="bg-[#F8F5EE] rounded-3xl p-5 border border-[#E6DEC9] space-y-4">
+                    <div className="flex items-center justify-between border-b border-[#E6DEC9] pb-2">
+                      <div className="flex items-center space-x-1.5 text-[#2D2824]">
+                        <Sliders className="w-4 h-4 text-[#8F2A19]" />
+                        <span className="text-xs font-bold tracking-wider uppercase font-sans">Refine Topic & Mind</span>
                       </div>
-                      <span className="text-[10px] text-slate-400">Tailored Content</span>
+                      <span className="text-[10px] text-[#8C8276]">Tailored Content</span>
                     </div>
 
                     {/* Mood Selector Grid */}
                     <div className="space-y-1.5">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">How are you feeling right now?</label>
+                      <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">How are you feeling right now?</label>
                       <div className="grid grid-cols-3 gap-1.5">
                         {moodConfigs.map((mood) => {
                           const isSelected = selectedMood === mood.id;
@@ -614,8 +696,8 @@ export default function App() {
                               onClick={() => setSelectedMood(mood.id as MoodType)}
                               className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all ${
                                 isSelected 
-                                  ? 'bg-white/15 border-white/30 text-white font-medium scale-[1.03]' 
-                                  : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-300'
+                                  ? 'bg-[#8F2A19] border-[#8F2A19] text-[#FCFAF3] scale-[1.02] font-semibold classic-shadow' 
+                                  : 'bg-[#FCFAF3] border-[#E6DEC9] hover:bg-[#F3EFE3] text-[#615A52]'
                               }`}
                             >
                               <span className="text-lg mb-0.5">{mood.emoji}</span>
@@ -628,7 +710,7 @@ export default function App() {
 
                     {/* Category Selector Rows */}
                     <div className="space-y-1.5">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Inspirational Theme Focus</label>
+                      <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">Inspirational Theme Focus</label>
                       <div className="grid grid-cols-2 gap-1.5">
                         {categoryConfigs.map((cat) => {
                           const isSelected = selectedCategory === cat.id;
@@ -638,11 +720,11 @@ export default function App() {
                               onClick={() => setSelectedCategory(cat.id as CategoryType)}
                               className={`flex items-center space-x-2 px-3 py-2.5 rounded-xl border transition-all text-left ${
                                 isSelected 
-                                  ? 'bg-white/15 border-white/30 text-white font-medium' 
-                                  : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-300'
+                                  ? 'bg-[#8F2A19] border-[#8F2A19] text-[#FCFAF3] font-semibold classic-shadow' 
+                                  : 'bg-[#FCFAF3] border-[#E6DEC9] hover:bg-[#F3EFE3] text-[#615A52]'
                               }`}
                             >
-                              <span className="p-1 rounded-lg bg-white/5 text-indigo-300">
+                              <span className={`p-1 rounded-lg ${isSelected ? 'bg-white/20 text-[#FCFAF3]' : 'bg-[#F5F2EB] text-[#8F2A19]'}`}>
                                 {getCategoryIcon(cat.iconName)}
                               </span>
                               <span className="text-[10px] font-medium truncate">{cat.label}</span>
@@ -655,9 +737,9 @@ export default function App() {
                     {/* Custom Topic Focus Input */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Custom Focus (Optional)</label>
+                        <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">Custom Focus (Optional)</label>
                         {customTopic && (
-                          <button onClick={() => setCustomTopic('')} className="text-[9px] text-fuchsia-400 hover:underline">Clear</button>
+                          <button onClick={() => setCustomTopic('')} className="text-[9px] text-[#8F2A19] hover:underline">Clear</button>
                         )}
                       </div>
                       <input 
@@ -665,7 +747,7 @@ export default function App() {
                         value={customTopic}
                         onChange={(e) => setCustomTopic(e.target.value)}
                         placeholder="e.g. debugging, deep focus, workout..." 
-                        className="w-full text-xs px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                        className="w-full text-xs px-3 py-2 bg-[#FCFAF3] border border-[#E6DEC9] rounded-xl text-[#2D2824] placeholder-stone-400 focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20"
                       />
                     </div>
                   </div>
@@ -675,7 +757,7 @@ export default function App() {
                     <button 
                       onClick={generateNewQuote}
                       disabled={isLoading}
-                      className="w-full py-4 bg-gradient-to-r from-indigo-500 to-fuchsia-500 hover:from-indigo-400 hover:to-fuchsia-400 disabled:opacity-50 text-white font-bold tracking-widest text-xs uppercase rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-2"
+                      className="w-full py-4 bg-[#8F2A19] hover:bg-[#731F11] disabled:opacity-50 text-[#FCFAF3] font-bold tracking-widest text-xs uppercase rounded-2xl transition-all shadow-md active:scale-95 flex items-center justify-center space-x-2"
                     >
                       {isLoading ? (
                         <>
@@ -696,11 +778,11 @@ export default function App() {
                         disabled={!currentQuote || isLoading}
                         className={`flex items-center justify-center space-x-2 py-3.5 rounded-xl border transition-all active:scale-95 disabled:opacity-40 ${
                           isCurrentFavorited 
-                            ? 'bg-fuchsia-500/20 hover:bg-fuchsia-500/30 border-fuchsia-500/40 text-fuchsia-300' 
-                            : 'bg-white/5 hover:bg-white/10 border-white/10 text-white/80'
+                            ? 'bg-[#8F2A19]/15 hover:bg-[#8F2A19]/25 border-[#8F2A19]/30 text-[#8F2A19]' 
+                            : 'bg-[#FCFAF3] hover:bg-[#F3EFE3] border-[#E6DEC9] text-[#615A52]'
                         }`}
                       >
-                        <Heart className={`w-4 h-4 ${isCurrentFavorited ? 'fill-fuchsia-500 text-fuchsia-500' : ''}`} />
+                        <Heart className={`w-4 h-4 ${isCurrentFavorited ? 'fill-[#8F2A19] text-[#8F2A19]' : ''}`} />
                         <span className="text-[10px] font-bold tracking-widest uppercase">
                           {isCurrentFavorited ? 'Favorited' : 'Save'}
                         </span>
@@ -709,7 +791,7 @@ export default function App() {
                       <button 
                         onClick={() => shareQuote(currentQuote)}
                         disabled={!currentQuote || isLoading}
-                        className="flex items-center justify-center space-x-2 py-3.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-white/80 transition-all active:scale-95 disabled:opacity-40"
+                        className="flex items-center justify-center space-x-2 py-3.5 bg-[#FCFAF3] hover:bg-[#F3EFE3] rounded-xl border border-[#E6DEC9] text-[#615A52] transition-all active:scale-95 disabled:opacity-40"
                       >
                         <Share2 className="w-4 h-4" />
                         <span className="text-[10px] font-bold tracking-widest uppercase">Share</span>
@@ -723,7 +805,7 @@ export default function App() {
               {activeTab === 'library' && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase">My Saved Library ({savedQuotes.length})</span>
+                    <span className="text-[11px] font-bold tracking-wider text-[#2D2824] uppercase">My Saved Library ({savedQuotes.length})</span>
                     {savedQuotes.length > 0 && (
                       <button 
                         onClick={() => {
@@ -732,7 +814,7 @@ export default function App() {
                             triggerToast('Library cleared.');
                           }
                         }}
-                        className="text-[9px] text-red-400 hover:underline hover:text-red-300"
+                        className="text-[9px] text-red-700 hover:text-red-800 hover:underline font-semibold"
                       >
                         Clear All
                       </button>
@@ -740,17 +822,17 @@ export default function App() {
                   </div>
 
                   {savedQuotes.length === 0 ? (
-                    <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-8 text-center space-y-3">
-                      <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto text-slate-400">
+                    <div className="bg-[#F8F5EE] border border-[#E6DEC9] rounded-3xl p-8 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-[#F5F2EB] flex items-center justify-center mx-auto text-[#8C8276]">
                         <Heart className="w-5 h-5" />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-white text-sm font-semibold">Your Library is Empty</p>
-                        <p className="text-slate-400 text-xs">Tap "Save" on the generator screen to archive quotes that resonate with you.</p>
+                        <p className="text-[#2D2824] text-sm font-semibold">Your Library is Empty</p>
+                        <p className="text-[#615A52] text-xs">Tap "Save" on the generator screen to archive quotes that resonate with you.</p>
                       </div>
                       <button 
                         onClick={() => setActiveTab('home')}
-                        className="text-xs font-bold text-fuchsia-400 hover:underline pt-2 inline-block"
+                        className="text-xs font-bold text-[#8F2A19] hover:underline pt-2 inline-block"
                       >
                         Go find inspiration
                       </button>
@@ -760,26 +842,26 @@ export default function App() {
                       {savedQuotes.map((quote) => (
                         <div 
                           key={quote.id}
-                          className="bg-white/[0.04] border border-white/10 rounded-2xl p-4 space-y-3 hover:border-white/20 transition-all relative group"
+                          className="bg-[#FCFAF3] border border-[#E6DEC9] rounded-2xl p-4 space-y-3 hover:border-[#C4B295] transition-all relative group classic-shadow"
                         >
-                          <p className="text-white text-sm font-medium italic leading-relaxed">
+                          <p className="text-[#2D2824] text-sm font-serif italic leading-relaxed">
                             "{quote.text}"
                           </p>
                           
                           <div className="flex justify-between items-center text-[10px]">
-                            <span className="text-fuchsia-400 font-bold uppercase tracking-wider">— {quote.author}</span>
+                            <span className="text-[#8F2A19] font-bold uppercase tracking-wider">— {quote.author}</span>
                             
                             <div className="flex items-center space-x-1.5 opacity-90 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={() => shareQuote(quote)}
-                                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300"
+                                className="p-1.5 rounded-lg bg-[#F5F2EB] hover:bg-[#EAE3D2] text-[#615A52] border border-[#E6DEC9]"
                                 title="Share Quote"
                               >
                                 <Share2 className="w-3.5 h-3.5" />
                               </button>
                               <button 
                                 onClick={() => deleteFromLibrary(quote.id)}
-                                className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400"
+                                className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200"
                                 title="Delete Quote"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -788,11 +870,11 @@ export default function App() {
                           </div>
 
                           {quote.explanation && (
-                            <details className="text-[11px] text-slate-400 border-t border-white/5 pt-2">
-                              <summary className="cursor-pointer hover:text-slate-200 focus:outline-none select-none font-semibold text-indigo-300">
+                            <details className="text-[11px] text-[#615A52] border-t border-[#E6DEC9] pt-2">
+                              <summary className="cursor-pointer hover:text-[#8F2A19] focus:outline-none select-none font-semibold text-[#8F2A19]">
                                 View Coaching Context
                               </summary>
-                              <p className="mt-1 leading-relaxed bg-black/25 p-2 rounded-lg text-slate-300 border border-white/5">
+                              <p className="mt-1 leading-relaxed bg-[#F3EFE3] p-2.5 rounded-lg text-[#2D2824] border border-[#D6CDB5]">
                                 {quote.explanation}
                               </p>
                             </details>
@@ -807,41 +889,41 @@ export default function App() {
               {/* Tab: CREATE CUSTOM REMINDERS */}
               {activeTab === 'create' && (
                 <div className="space-y-4">
-                  <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase block">Write Your Own Wisdom</span>
+                  <span className="text-[11px] font-bold tracking-wider text-[#2D2824] uppercase block">Write Your Own Wisdom</span>
                   
-                  <form onSubmit={handleSaveCustomQuote} className="bg-white/[0.03] border border-white/5 rounded-3xl p-5 space-y-4">
+                  <form onSubmit={handleSaveCustomQuote} className="bg-[#F8F5EE] border border-[#E6DEC9] rounded-3xl p-5 space-y-4 classic-shadow">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Your Motivational Quote</label>
+                      <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">Your Motivational Quote</label>
                       <textarea
                         required
                         value={customText}
                         onChange={(e) => setCustomText(e.target.value)}
                         placeholder="Type a powerful phrase or daily reminder that lifts you up..."
                         rows={4}
-                        className="w-full text-xs p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 resize-none"
+                        className="w-full text-xs p-3 bg-[#FCFAF3] border border-[#E6DEC9] rounded-xl text-[#2D2824] placeholder-stone-400 focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20 resize-none"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Author Attribution</label>
+                      <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">Author Attribution</label>
                       <input
                         type="text"
                         value={customAuthor}
                         onChange={(e) => setCustomAuthor(e.target.value)}
                         placeholder="e.g. My Inner Voice, Ancient Proverb, or Anonymous"
-                        className="w-full text-xs px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                        className="w-full text-xs px-3 py-2 bg-[#FCFAF3] border border-[#E6DEC9] rounded-xl text-[#2D2824] placeholder-stone-400 focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Category Alignment</label>
+                      <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">Category Alignment</label>
                       <select
                         value={customCategory}
                         onChange={(e) => setCustomCategory(e.target.value as CategoryType)}
-                        className="w-full text-xs px-3 py-2 bg-[#0d122b] border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full text-xs px-3 py-2 bg-[#FCFAF3] border border-[#E6DEC9] rounded-xl text-[#2D2824] focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20"
                       >
                         {categoryConfigs.map((c) => (
-                          <option key={c.id} value={c.id} className="bg-slate-900 text-white">
+                          <option key={c.id} value={c.id} className="bg-[#FCFAF3] text-[#2D2824]">
                             {c.label}
                           </option>
                         ))}
@@ -850,15 +932,15 @@ export default function App() {
 
                     <button
                       type="submit"
-                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition-all active:scale-95 flex items-center justify-center space-x-2"
+                      className="w-full py-3 bg-[#8F2A19] hover:bg-[#731F11] text-[#FCFAF3] text-xs font-bold uppercase tracking-widest rounded-xl transition-all active:scale-95 flex items-center justify-center space-x-2"
                     >
                       <Plus className="w-4 h-4" />
                       <span>Add to My Library</span>
                     </button>
                   </form>
 
-                  <div className="bg-white/[0.01] border border-white/5 rounded-2xl p-4 text-xs text-slate-400 space-y-2">
-                    <p className="font-semibold text-slate-300">💡 Tip: Self-Generated Reminders</p>
+                  <div className="bg-[#F3EFE3] border border-[#D6CDB5] rounded-2xl p-4 text-xs text-[#615A52] space-y-2">
+                    <p className="font-semibold text-[#8F2A19]">💡 Tip: Self-Generated Reminders</p>
                     <p className="leading-relaxed">
                       Writing your own reminders reinforces intentional thought loops. These will show up in your Saved Library tab where you can easily read, copy, or share them.
                     </p>
@@ -866,14 +948,191 @@ export default function App() {
                 </div>
               )}
 
+              {/* Tab: STATISTICS */}
+              {activeTab === 'stats' && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-bold tracking-wider text-[#2D2824] uppercase">30-Day Insights</span>
+                    <div className="flex items-center space-x-2">
+                      {generatedHistory.length > 0 && (
+                        <button 
+                          onClick={() => {
+                            if (confirm('Are you sure you want to reset all your statistics and local history? This cannot be undone.')) {
+                              setGeneratedHistory([]);
+                              localStorage.removeItem('pocket_motivation_generated_history');
+                              triggerToast('Statistics and logs have been reset.');
+                            }
+                          }}
+                          className="text-[10px] text-[#8F2A19] hover:underline flex items-center gap-1 font-bold"
+                          title="Reset Statistics"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Reset</span>
+                        </button>
+                      )}
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border bg-[#8F2A19]/10 text-[#8F2A19] border-[#8F2A19]/20 flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3" />
+                        LOCAL LOGS
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-[#F8F5EE] border border-[#E6DEC9] rounded-2xl p-2.5 flex flex-col items-center text-center classic-shadow">
+                      <span className="text-[9px] text-[#615A52] font-bold uppercase tracking-wider text-[8px]">Generated</span>
+                      <span className="text-sm font-extrabold text-[#8F2A19] mt-1 font-display">{last30DaysQuotes.length}</span>
+                      <span className="text-[7px] text-[#8C8276] mt-0.5">last 30d</span>
+                    </div>
+
+                    <div className="bg-[#F8F5EE] border border-[#E6DEC9] rounded-2xl p-2.5 flex flex-col items-center text-center truncate classic-shadow">
+                      <span className="text-[9px] text-[#615A52] font-bold uppercase tracking-wider text-[8px]">Top Mood</span>
+                      <span className="text-xs font-bold text-[#3D6E53] mt-1 flex items-center gap-0.5">
+                        <span>{topMoodConfig.emoji}</span>
+                        <span className="truncate max-w-[40px]">{topMoodConfig.label}</span>
+                      </span>
+                      <span className="text-[7px] text-[#8C8276] mt-0.5">felt {maxMoodCount}x</span>
+                    </div>
+
+                    <div className="bg-[#F8F5EE] border border-[#E6DEC9] rounded-2xl p-2.5 flex flex-col items-center text-center truncate classic-shadow">
+                      <span className="text-[9px] text-[#615A52] font-bold uppercase tracking-wider text-[8px]">Top Focus</span>
+                      <span className="text-xs font-bold text-[#965664] mt-1 flex items-center gap-0.5">
+                        <span className="truncate max-w-[48px]">{topCategoryConfig.label.split(' ')[0]}</span>
+                      </span>
+                      <span className="text-[7px] text-[#8C8276] mt-0.5">read {maxCatCount}x</span>
+                    </div>
+                  </div>
+
+                  {/* Mood Ring Card */}
+                  <div className="bg-[#F8F5EE] border border-[#E6DEC9] rounded-3xl p-4 space-y-2 classic-shadow">
+                    <div className="flex justify-between items-center px-1">
+                      <h3 className="text-[10px] font-bold text-[#2D2824] uppercase tracking-wider flex items-center gap-1">
+                        <Activity className="w-3.5 h-3.5 text-[#8F2A19]" />
+                        <span>Mood Distribution</span>
+                      </h3>
+                      <span className="text-[8px] text-[#8C8276] font-mono">Radial Profiles</span>
+                    </div>
+
+                    {moodChartData.length === 0 ? (
+                      <div className="h-28 flex items-center justify-center text-[#615A52] text-xs">
+                        No generations logged yet.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <div className="w-full h-32 relative flex items-center justify-center">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={moodChartData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={28}
+                                outerRadius={42}
+                                paddingAngle={4}
+                                dataKey="value"
+                              >
+                                {moodChartData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    return (
+                                      <div className="bg-[#FCFAF3] border border-[#E6DEC9] px-2.5 py-1 rounded text-[10px] text-[#2D2824] flex items-center gap-1 classic-shadow">
+                                        <span>{data.emoji}</span>
+                                        <span>{data.name}:</span>
+                                        <span className="font-bold">{data.value}</span>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          {/* Inner details */}
+                          <div className="absolute flex flex-col items-center pointer-events-none">
+                            <span className="text-[8px] text-[#8C8276] font-bold uppercase tracking-wider">Top</span>
+                            <span className="text-xs">{topMoodConfig.emoji}</span>
+                          </div>
+                        </div>
+
+                        {/* Custom Legend */}
+                        <div className="grid grid-cols-2 gap-1.5 w-full pt-1">
+                          {moodChartData.map((m, idx) => (
+                            <div key={idx} className="flex items-center space-x-1.5 text-[8px] text-[#2D2824] bg-[#FCFAF3] border border-[#E6DEC9] px-2 py-1 rounded-lg">
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                              <span className="truncate">{m.emoji} {m.name}</span>
+                              <span className="font-bold text-[#8C8276] ml-auto">{m.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Focus Categories Card */}
+                  <div className="bg-[#F8F5EE] border border-[#E6DEC9] rounded-3xl p-4 space-y-2 classic-shadow">
+                    <div className="flex justify-between items-center px-1">
+                      <h3 className="text-[10px] font-bold text-[#2D2824] uppercase tracking-wider flex items-center gap-1">
+                        <TrendingUp className="w-3.5 h-3.5 text-[#8F2A19]" />
+                        <span>Inspirational Focus</span>
+                      </h3>
+                      <span className="text-[8px] text-[#8C8276] font-mono">Categories</span>
+                    </div>
+
+                    <div className="w-full pr-2">
+                      <ResponsiveContainer width="100%" height={140}>
+                        <BarChart
+                          data={categoryChartData}
+                          layout="vertical"
+                          margin={{ top: 5, right: 5, left: -25, bottom: 5 }}
+                        >
+                          <XAxis type="number" hide />
+                          <YAxis 
+                            type="category" 
+                            dataKey="shortName" 
+                            stroke="#615A52" 
+                            fontSize={9} 
+                            tickLine={false} 
+                            axisLine={false} 
+                          />
+                          <Tooltip
+                            cursor={{ fill: 'rgba(143, 42, 25, 0.05)' }}
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                return (
+                                  <div className="bg-[#FCFAF3] border border-[#E6DEC9] px-2.5 py-1 rounded text-[10px] text-[#2D2824] classic-shadow">
+                                    <span className="font-bold text-[#8F2A19]">{data.name}:</span> {data.value} quotes
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={8}>
+                            {categoryChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* Bottom Tab Navigation Bar */}
-            <div className="h-16 border-t border-white/10 flex items-center justify-around px-2 bg-white/[0.04] relative z-20">
+            <div className="h-16 border-t border-[#E6DEC9] flex items-center justify-around px-2 bg-[#F8F5EE] relative z-20">
               <button 
                 onClick={() => setActiveTab('home')}
                 className={`flex flex-col items-center flex-1 py-1 transition-all ${
-                  activeTab === 'home' ? 'text-fuchsia-400 scale-105 font-semibold' : 'text-slate-400 hover:text-white'
+                  activeTab === 'home' ? 'text-[#8F2A19] scale-105 font-semibold' : 'text-[#8C8276] hover:text-[#2D2824]'
                 }`}
               >
                 <Compass className="w-5 h-5" />
@@ -883,7 +1142,7 @@ export default function App() {
               <button 
                 onClick={() => setActiveTab('library')}
                 className={`flex flex-col items-center flex-1 py-1 transition-all ${
-                  activeTab === 'library' ? 'text-fuchsia-400 scale-105 font-semibold' : 'text-slate-400 hover:text-white'
+                  activeTab === 'library' ? 'text-[#8F2A19] scale-105 font-semibold' : 'text-[#8C8276] hover:text-[#2D2824]'
                 }`}
               >
                 <Heart className="w-5 h-5" />
@@ -893,21 +1152,31 @@ export default function App() {
               <button 
                 onClick={() => setActiveTab('create')}
                 className={`flex flex-col items-center flex-1 py-1 transition-all ${
-                  activeTab === 'create' ? 'text-fuchsia-400 scale-105 font-semibold' : 'text-slate-400 hover:text-white'
+                  activeTab === 'create' ? 'text-[#8F2A19] scale-105 font-semibold' : 'text-[#8C8276] hover:text-[#2D2824]'
                 }`}
               >
                 <Plus className="w-5 h-5" />
                 <span className="text-[9px] font-bold mt-1 uppercase tracking-wide">Custom</span>
               </button>
-            </div>
 
-            {/* Native Toast Alerts */}
-            {toastMessage && (
-              <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-white/20 text-white px-4 py-2 rounded-full text-xs font-medium tracking-wide shadow-2xl flex items-center space-x-2 z-50 animate-[fadeIn_0.2s_ease-out]">
-                <div className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 animate-ping"></div>
-                <span>{toastMessage}</span>
-              </div>
-            )}
+              <button 
+                onClick={() => setActiveTab('stats')}
+                className={`flex flex-col items-center flex-1 py-1 transition-all ${
+                  activeTab === 'stats' ? 'text-[#8F2A19] scale-105 font-semibold' : 'text-[#8C8276] hover:text-[#2D2824]'
+                }`}
+              >
+                <TrendingUp className="w-5 h-5" />
+                <span className="text-[9px] font-bold mt-1 uppercase tracking-wide">Stats</span>
+               </button>
+             </div>
+ 
+             {/* Native Toast Alerts */}
+             {toastMessage && (
+               <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-[#8F2A19] border border-[#E6DEC9] text-[#FCFAF3] px-4 py-2 rounded-full text-xs font-medium tracking-wide shadow-lg flex items-center space-x-2 z-50 animate-[fadeIn_0.2s_ease-out]">
+                 <div className="w-1.5 h-1.5 rounded-full bg-[#C59B27] animate-ping"></div>
+                 <span>{toastMessage}</span>
+               </div>
+             )}
 
           </div>
 

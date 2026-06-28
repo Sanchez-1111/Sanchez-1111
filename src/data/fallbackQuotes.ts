@@ -180,19 +180,19 @@ export const fallbackQuotes: Quote[] = [
 ];
 
 export const moodConfigs = [
-  { id: 'tired', label: 'Tired', emoji: '🥱', color: '#8B5CF6', bgColor: 'rgba(139, 92, 246, 0.1)', description: 'Overwhelmed or drained' },
-  { id: 'anxious', label: 'Anxious', emoji: '🥺', color: '#EF4444', bgColor: 'rgba(239, 68, 68, 0.1)', description: 'Stressed or uncertain' },
-  { id: 'unfocused', label: 'Unfocused', emoji: '🌀', color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.1)', description: 'Distracted or scattered' },
-  { id: 'low-energy', label: 'Low Energy', emoji: '🔋', color: '#3B82F6', bgColor: 'rgba(59, 130, 246, 0.1)', description: 'Sluggish or uninspired' },
-  { id: 'excited', label: 'Excited', emoji: '⚡', color: '#10B981', bgColor: 'rgba(16, 185, 129, 0.1)', description: 'Ready to build or create' },
-  { id: 'general', label: 'Just Fine', emoji: '😊', color: '#EC4899', bgColor: 'rgba(236, 72, 153, 0.1)', description: 'Steady and ready' }
+  { id: 'tired', label: 'Tired', emoji: '🥱', color: '#7C6053', bgColor: 'rgba(124, 96, 83, 0.08)', description: 'Overwhelmed or drained' },
+  { id: 'anxious', label: 'Anxious', emoji: '🥺', color: '#A04838', bgColor: 'rgba(160, 72, 56, 0.08)', description: 'Stressed or uncertain' },
+  { id: 'unfocused', label: 'Unfocused', emoji: '🌀', color: '#B5843C', bgColor: 'rgba(181, 132, 60, 0.08)', description: 'Distracted or scattered' },
+  { id: 'low-energy', label: 'Low Energy', emoji: '🔋', color: '#506873', bgColor: 'rgba(80, 104, 115, 0.08)', description: 'Sluggish or uninspired' },
+  { id: 'excited', label: 'Excited', emoji: '⚡', color: '#3D6E53', bgColor: 'rgba(61, 110, 83, 0.08)', description: 'Ready to build or create' },
+  { id: 'general', label: 'Just Fine', emoji: '😊', color: '#965664', bgColor: 'rgba(150, 86, 100, 0.08)', description: 'Steady and ready' }
 ];
 
 export const categoryConfigs = [
-  { id: 'general', label: 'General Motivation', iconName: 'Compass', color: '#6366F1', description: 'Daily wisdom for balanced living' },
-  { id: 'mindset', label: 'Mindset & Growth', iconName: 'Brain', color: '#8B5CF6', description: 'Overcome self-doubt and build resilience' },
-  { id: 'career', label: 'Career & Ambition', iconName: 'Briefcase', color: '#F59E0B', description: 'Achieve goals and stay productive' },
-  { id: 'creative', label: 'Creativity & Focus', iconName: 'Sparkles', color: '#EC4899', description: 'Unlock blockages and express yourself' },
-  { id: 'health', label: 'Health & Vitality', iconName: 'Heart', color: '#EF4444', description: 'Honor your body and mental peace' },
-  { id: 'relationships', label: 'Relationships & Love', iconName: 'Users', color: '#10B981', description: 'Connect deeply and communicate with trust' }
+  { id: 'general', label: 'General Motivation', iconName: 'Compass', color: '#8F2A19', description: 'Daily wisdom for balanced living' },
+  { id: 'mindset', label: 'Mindset & Growth', iconName: 'Brain', color: '#5C4E72', description: 'Overcome self-doubt and build resilience' },
+  { id: 'career', label: 'Career & Ambition', iconName: 'Briefcase', color: '#996A32', description: 'Achieve goals and stay productive' },
+  { id: 'creative', label: 'Creativity & Focus', iconName: 'Sparkles', color: '#A0526B', description: 'Unlock blockages and express yourself' },
+  { id: 'health', label: 'Health & Vitality', iconName: 'Heart', color: '#3C664C', description: 'Honor your body and mental peace' },
+  { id: 'relationships', label: 'Relationships & Love', iconName: 'Users', color: '#4A607A', description: 'Connect deeply and communicate with trust' }
 ];
