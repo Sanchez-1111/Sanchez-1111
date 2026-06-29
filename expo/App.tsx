@@ -638,30 +638,6 @@ export default function App() {
                 />
               </View>
 
-              {/* Wisdom Source Selection */}
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>WISDOM SOURCE</Text>
-                <View style={styles.sourceSelectorContainer}>
-                  <TouchableOpacity 
-                    onPress={() => setQuoteSource('both')}
-                    style={[styles.sourceBtn, quoteSource === 'both' && styles.sourceBtnActive]}
-                  >
-                    <Text style={[styles.sourceBtnText, quoteSource === 'both' && styles.sourceBtnTextActive]}>COMBINED</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => setQuoteSource('ai')}
-                    style={[styles.sourceBtn, quoteSource === 'ai' && styles.sourceBtnActive]}
-                  >
-                    <Text style={[styles.sourceBtnText, quoteSource === 'ai' && styles.sourceBtnTextActive]}>AI COACH</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => setQuoteSource('community')}
-                    style={[styles.sourceBtn, quoteSource === 'community' && styles.sourceBtnActive]}
-                  >
-                    <Text style={[styles.sourceBtnText, quoteSource === 'community' && styles.sourceBtnTextActive]}>COMMUNITY</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
             </View>
 
             {/* Action Buttons */}
@@ -974,49 +950,6 @@ export default function App() {
                 </View>
               )}
             </View>
-
-            {/* Drawer for Advanced Server Connection IP Settings */}
-            <TouchableOpacity 
-              onPress={() => setShowAdvanced(!showAdvanced)} 
-              style={styles.advancedToggle}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.advancedToggleText}>
-                {showAdvanced ? 'Hide Connection Details' : 'Advanced Connection Settings'}
-              </Text>
-            </TouchableOpacity>
-
-            {showAdvanced && (
-              <View style={styles.advancedForm}>
-                <Text style={styles.advancedFormLabel}>Backend API Host URL</Text>
-                <Text style={styles.advancedFormSubLabel}>
-                  Change this if you run your development server locally on your laptop network.
-                </Text>
-                <TextInput
-                  value={hostInput}
-                  onChangeText={setHostInput}
-                  placeholder={API_HOST}
-                  placeholderTextColor="#8C8276"
-                  autoCapitalize="none"
-                  style={styles.topicInput}
-                />
-                <View style={styles.advancedBtnRow}>
-                  <TouchableOpacity onPress={() => {
-                    setHostInput('');
-                    setCustomApiHost('');
-                    AsyncStorage.removeItem('pocket_motivation_api_host');
-                    triggerToast('Reset to Default cloud backend.');
-                    setShowAdvanced(false);
-                  }} style={styles.advancedBtnSub}>
-                    <Text style={styles.advancedBtnSubText}>Reset to Default</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={updateCustomHost} style={styles.advancedBtnPrimary}>
-                    <Text style={styles.advancedBtnPrimaryText}>Save Server IP</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
 
           </ScrollView>
         )}

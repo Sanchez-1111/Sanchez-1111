@@ -892,46 +892,6 @@ export default function App() {
                         className="w-full text-xs px-3 py-2 bg-[#FCFAF3] border border-[#E6DEC9] rounded-xl text-[#2D2824] placeholder-stone-400 focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20"
                       />
                     </div>
-
-                    {/* Wisdom Source Selector */}
-                    <div className="space-y-1.5 pt-1">
-                      <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">Wisdom Source</label>
-                      <div className="grid grid-cols-3 gap-1 bg-[#FCFAF3] p-1 border border-[#E6DEC9] rounded-xl">
-                        <button
-                          type="button"
-                          onClick={() => setQuoteSource('both')}
-                          className={`py-1.5 px-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all text-center ${
-                            quoteSource === 'both'
-                              ? 'bg-[#8F2A19] text-[#FCFAF3] classic-shadow'
-                              : 'text-[#615A52] hover:bg-[#F3EFE3]'
-                          }`}
-                        >
-                          Combined
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setQuoteSource('ai')}
-                          className={`py-1.5 px-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all text-center ${
-                            quoteSource === 'ai'
-                              ? 'bg-[#8F2A19] text-[#FCFAF3] classic-shadow'
-                              : 'text-[#615A52] hover:bg-[#F3EFE3]'
-                          }`}
-                        >
-                          AI Coach
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setQuoteSource('community')}
-                          className={`py-1.5 px-2 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all text-center ${
-                            quoteSource === 'community'
-                              ? 'bg-[#8F2A19] text-[#FCFAF3] classic-shadow'
-                              : 'text-[#615A52] hover:bg-[#F3EFE3]'
-                          }`}
-                        >
-                          Community
-                        </button>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Core Actions Buttons */}
@@ -1070,184 +1030,94 @@ export default function App() {
 
               {/* Tab: CREATE CUSTOM REMINDERS */}
               {activeTab === 'create' && (
-                <div className="space-y-5 h-full flex flex-col">
-                  {/* Dashboard Header Stats - inline flex cards */}
-                  <div className="flex gap-3 shrink-0">
-                    <div className="flex-1 bg-[#F8F5EE] border border-[#E6DEC9] rounded-2xl p-3 flex items-center justify-between classic-shadow">
-                      <div className="space-y-0.5">
-                        <span className="text-[9px] text-[#615A52] font-semibold uppercase tracking-wider block">My Wisdom</span>
-                        <div className="text-lg font-bold text-[#8F2A19] font-serif">
-                          {savedQuotes.filter(q => q.isCustom).length} <span className="text-[10px] font-normal text-stone-500">saved</span>
-                        </div>
-                      </div>
-                      <div className="bg-[#8F2A19]/10 p-2 rounded-lg">
-                        <Bookmark className="w-4 h-4 text-[#8F2A19]" />
-                      </div>
-                    </div>
-
-                    <div className="flex-1 bg-[#F8F5EE] border border-[#E6DEC9] rounded-2xl p-3 flex items-center justify-between classic-shadow">
-                      <div className="space-y-0.5">
-                        <span className="text-[9px] text-[#615A52] font-semibold uppercase tracking-wider block">Community Pool</span>
-                        <div className="text-lg font-bold text-[#2D2824] font-serif">
-                          {communityQuotes.length} <span className="text-[10px] font-normal text-stone-500">public</span>
-                        </div>
-                      </div>
-                      <div className="bg-[#2D2824]/10 p-2 rounded-lg">
-                        <Users className="w-4 h-4 text-[#2D2824]" />
-                      </div>
-                    </div>
-                  </div>
+                <div className="space-y-6">
+                  {/* Title of the tab */}
+                  <h2 className="text-[11px] font-bold tracking-wider text-[#2D2824] uppercase">
+                    WRITE YOUR OWN WISDOM
+                  </h2>
 
                   {/* Creation Form Panel */}
-                  <div className="bg-[#F8F5EE] border border-[#E6DEC9] rounded-2xl p-4 space-y-3 classic-shadow shrink-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold tracking-wider text-[#2D2824] uppercase">Draft & Publish Wisdom</span>
-                      <Sparkles className="w-3.5 h-3.5 text-[#8F2A19] animate-pulse" />
-                    </div>
-                    
-                    <form onSubmit={handleSaveCustomQuote} className="space-y-3">
-                      <div className="space-y-1">
+                  <div className="bg-[#F8F5EE] border border-[#E6DEC9] rounded-2xl p-5 space-y-5 classic-shadow">
+                    <form onSubmit={handleSaveCustomQuote} className="space-y-5">
+                      
+                      {/* Section 1: YOUR MOTIVATIONAL QUOTE */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">
+                          YOUR MOTIVATIONAL QUOTE
+                        </label>
                         <textarea
                           required
                           value={customText}
                           onChange={(e) => setCustomText(e.target.value)}
-                          placeholder="Type a powerful motivational phrase or reminder..."
-                          rows={2}
-                          className="w-full text-xs p-2.5 bg-[#FCFAF3] border border-[#E6DEC9] rounded-xl text-[#2D2824] placeholder-stone-400 focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20 resize-none leading-relaxed"
+                          placeholder="Type a powerful phrase or daily reminder that lifts you up..."
+                          rows={4}
+                          className="w-full text-xs p-3.5 bg-[#FCFAF3] border border-[#E6DEC9] rounded-xl text-[#2D2824] placeholder-stone-400 focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20 resize-none leading-relaxed"
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-0.5">
-                          <label className="text-[8px] text-[#615A52] font-bold uppercase tracking-wider block">Attribution</label>
-                          <input
-                            type="text"
-                            value={customAuthor}
-                            onChange={(e) => setCustomAuthor(e.target.value)}
-                            placeholder="e.g. Inner Voice"
-                            className="w-full text-[11px] px-2.5 py-1.5 bg-[#FCFAF3] border border-[#E6DEC9] rounded-lg text-[#2D2824] placeholder-stone-400 focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20"
-                          />
-                        </div>
+                      {/* Section 2: AUTHOR ATTRIBUTION */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">
+                          AUTHOR ATTRIBUTION
+                        </label>
+                        <input
+                          type="text"
+                          value={customAuthor}
+                          onChange={(e) => setCustomAuthor(e.target.value)}
+                          placeholder="e.g. My Inner Voice, Ancient Proverb, or Anonymous"
+                          className="w-full text-xs px-3.5 py-3.5 bg-[#FCFAF3] border border-[#E6DEC9] rounded-xl text-[#2D2824] placeholder-stone-400 focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20"
+                        />
+                      </div>
 
-                        <div className="space-y-0.5">
-                          <label className="text-[8px] text-[#615A52] font-bold uppercase tracking-wider block">Category</label>
-                          <select
-                            value={customCategory}
-                            onChange={(e) => setCustomCategory(e.target.value as CategoryType)}
-                            className="w-full text-[11px] px-2 py-1.5 bg-[#FCFAF3] border border-[#E6DEC9] rounded-lg text-[#2D2824] focus:outline-none focus:border-[#8F2A19] focus:ring-1 focus:ring-[#8F2A19]/20"
-                          >
-                            {categoryConfigs.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.label}
-                              </option>
-                            ))}
-                          </select>
+                      {/* Section 3: CATEGORY ALIGNMENT */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-[#615A52] font-semibold uppercase tracking-wider block">
+                          CATEGORY ALIGNMENT
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {categoryConfigs.map((c) => {
+                            const isSelected = customCategory === c.id;
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => setCustomCategory(c.id as CategoryType)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                  isSelected
+                                    ? 'bg-[#8F2A19] text-[#FCFAF3] border-[#8F2A19] classic-shadow'
+                                    : 'bg-white text-[#615A52] border-[#E6DEC9] hover:bg-[#F3EFE3]'
+                                }`}
+                              >
+                                {c.label.split(' ')[0]}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
 
+                      {/* Submit Button */}
                       <button
                         type="submit"
-                        className="w-full py-2.5 bg-[#8F2A19] hover:bg-[#731F11] text-[#FCFAF3] text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all active:scale-95 flex items-center justify-center space-x-1.5 classic-shadow"
+                        className="w-full py-3.5 mt-2 bg-[#8F2A19] hover:bg-[#731F11] text-[#FCFAF3] text-[11px] font-bold uppercase tracking-wider rounded-xl transition-all active:scale-[0.98] flex items-center justify-center space-x-2 classic-shadow"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add to My Library & Publish</span>
+                        <Plus className="w-4 h-4" />
+                        <span>ADD TO MY LIBRARY & PUBLISH</span>
                       </button>
+
                     </form>
                   </div>
 
-                  {/* Segmented Controller & Sub-tab List Explorer */}
-                  <div className="flex-1 flex flex-col min-h-0 space-y-3">
-                    <div className="flex bg-[#F3EFE3] border border-[#E6DEC9] rounded-xl p-1 shrink-0">
-                      <button
-                        onClick={() => setWisdomSubTab('my')}
-                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all text-center ${
-                          wisdomSubTab === 'my'
-                            ? 'bg-[#8F2A19] text-[#FCFAF3] classic-shadow'
-                            : 'text-[#615A52] hover:bg-[#E6DEC9]/40'
-                        }`}
-                      >
-                        My Board
-                      </button>
-                      <button
-                        onClick={() => setWisdomSubTab('community')}
-                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all text-center ${
-                          wisdomSubTab === 'community'
-                            ? 'bg-[#8F2A19] text-[#FCFAF3] classic-shadow'
-                            : 'text-[#615A52] hover:bg-[#E6DEC9]/40'
-                        }`}
-                      >
-                        Global Feed
-                      </button>
+                  {/* Tip Box */}
+                  <div className="bg-[#FAF6EB] border border-[#E6DEC9] rounded-2xl p-4 space-y-1.5">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs">💡</span>
+                      <span className="text-xs font-bold text-[#8F2A19]">Tip: Self-Generated Reminders</span>
                     </div>
-
-                    {/* Scrollable list content */}
-                    <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-0 pb-4 custom-scrollbar">
-                      {wisdomSubTab === 'my' ? (
-                        savedQuotes.filter(q => q.isCustom).length === 0 ? (
-                          <div className="text-center py-10 bg-[#F8F5EE]/40 border border-dashed border-[#E6DEC9] rounded-2xl text-stone-400 space-y-2">
-                            <Sparkles className="w-5 h-5 mx-auto opacity-50" />
-                            <p className="text-[10px] font-medium">No custom wisdom yet. Use the form above to draft your first quote!</p>
-                          </div>
-                        ) : (
-                          savedQuotes.filter(q => q.isCustom).map((q) => (
-                            <div key={q.id} className="bg-[#FCFAF3] border border-[#E6DEC9] rounded-xl p-3.5 relative group space-y-2 classic-shadow">
-                              <p className="text-xs font-serif text-[#2D2824] italic leading-relaxed pr-8">"{q.text}"</p>
-                              <div className="flex justify-between items-center text-[10px] pt-1.5 border-t border-[#E6DEC9]/30 text-stone-500">
-                                <span>— {q.author}</span>
-                                <span className="bg-[#8F2A19]/10 text-[#8F2A19] px-2 py-0.5 rounded font-semibold text-[8px] uppercase">{q.category}</span>
-                              </div>
-                              <button
-                                onClick={() => deleteFromLibrary(q.id)}
-                                className="absolute top-2 right-2 p-1 text-[#8F2A19]/60 hover:text-[#8F2A19] hover:bg-[#8F2A19]/10 rounded-lg transition-all"
-                                title="Delete Wisdom"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))
-                        )
-                      ) : (
-                        communityQuotes.length === 0 ? (
-                          <div className="text-center py-10 bg-[#F8F5EE]/40 border border-dashed border-[#E6DEC9] rounded-2xl text-stone-400 space-y-2">
-                            <Users className="w-5 h-5 mx-auto opacity-50 animate-pulse" />
-                            <p className="text-[10px] font-medium">Awaiting public shared community contributions...</p>
-                          </div>
-                        ) : (
-                          communityQuotes.slice().reverse().map((q) => {
-                            const isSaved = savedQuotes.some(sq => sq.text === q.text);
-                            return (
-                              <div key={q.id} className="bg-[#FCFAF3] border border-[#E6DEC9]/60 rounded-xl p-3.5 space-y-2 relative group classic-shadow">
-                                <p className="text-xs text-[#2D2824] italic leading-relaxed pr-8">"{q.text}"</p>
-                                <div className="flex justify-between items-center text-[10px] pt-1.5 border-t border-[#E6DEC9]/30 text-stone-500">
-                                  <span>— {q.author}</span>
-                                  <div className="flex items-center space-x-1.5">
-                                    <span className="bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded text-[8px] font-semibold uppercase">{q.category}</span>
-                                    {!isSaved && (
-                                      <button
-                                        onClick={() => {
-                                          const newSaved = {
-                                            ...q,
-                                            id: `saved-comm-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                                            timestamp: Date.now()
-                                          };
-                                          updateSavedQuotes([newSaved, ...savedQuotes], newSaved);
-                                          triggerToast('Added community wisdom to library!');
-                                        }}
-                                        className="p-1 rounded bg-[#8F2A19]/10 text-[#8F2A19] hover:bg-[#8F2A19] hover:text-[#FCFAF3] transition-all"
-                                        title="Save to Library"
-                                      >
-                                        <Heart className="w-3 h-3 fill-[#8F2A19]" />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )
-                      )}
-                    </div>
+                    <p className="text-[11px] leading-relaxed text-[#615A52]">
+                      Writing your own reminders reinforces intentional thought loops. These will show up in your Saved Library tab where you can easily read, copy, or share them.
+                    </p>
                   </div>
+
                 </div>
               )}
 
