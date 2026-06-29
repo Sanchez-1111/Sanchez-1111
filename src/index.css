@@ -51,3 +51,14 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(140, 130, 118, 0.4);
 }
+
+@keyframes loadingProgress {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-progress {
+  animation: loadingProgress 2.2s ease-in-out infinite;
+}
+

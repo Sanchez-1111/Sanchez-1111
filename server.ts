@@ -5,6 +5,7 @@
 
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -16,6 +17,32 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+const SHARED_QUOTES_FILE = path.join(process.cwd(), "shared_quotes.json");
+
+// Helper to read shared public quotes
+function getSharedQuotes(): any[] {
+  try {
+    if (fs.existsSync(SHARED_QUOTES_FILE)) {
+      const data = fs.readFileSync(SHARED_QUOTES_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error("Error reading shared quotes:", e);
+  }
+  return [];
+}
+
+// Helper to save a public/shared quote
+function saveSharedQuote(quote: any) {
+  try {
+    const quotes = getSharedQuotes();
+    quotes.push(quote);
+    fs.writeFileSync(SHARED_QUOTES_FILE, JSON.stringify(quotes, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Error saving shared quote:", e);
+  }
+}
 
 // Lazy-initialized GoogleGenAI client
 let aiClient: GoogleGenAI | null = null;
@@ -45,18 +72,86 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// API endpoint to save user-submitted custom quotes for the community
+app.post("/api/save-custom-quote", (req, res) => {
+  const { text, author, category, mood, explanation } = req.body;
+  
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: "Quote text is required" });
+  }
+
+  const newQuote = {
+    id: `custom-shared-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+    text: text.trim(),
+    author: author && author.trim() ? author.trim() : "Anonymous Philanthropist",
+    category: category || "general",
+    mood: mood || "general",
+    explanation: explanation && explanation.trim() ? explanation.trim() : "A piece of shared soul from our global community.",
+    isCustom: true,
+    isSharedPublicly: true,
+    timestamp: Date.now()
+  };
+
+  saveSharedQuote(newQuote);
+  res.json({ success: true, quote: newQuote });
+});
+
+// API endpoint to retrieve all shared community quotes
+app.get("/api/shared-quotes", (req, res) => {
+  res.json(getSharedQuotes());
+});
+
 // API endpoint to generate motivational quote
 app.post("/api/generate-quote", async (req, res) => {
-  const { category, mood, customTopic } = req.body;
+  const { category, mood, customTopic, source } = req.body;
 
   const selectedCategory = category || "general";
   const selectedMood = mood || "general";
+  const selectedSource = source || "both"; // 'both' | 'ai' | 'community'
   const extraTopic = customTopic ? `specifically focusing on "${customTopic}"` : "";
 
+  // 1. Check if we should select a community/public quote
+  const sharedPool = getSharedQuotes();
+  const matchingShared = sharedPool.filter((q) => {
+    const matchesCategory = selectedCategory === "general" || q.category === selectedCategory;
+    const matchesMood = selectedMood === "general" || q.mood === selectedMood;
+    return matchesCategory && matchesMood;
+  });
+
+  let selectedFromCommunity = false;
+  let chosenQuote: any = null;
+
+  if (selectedSource === "community") {
+    if (matchingShared.length > 0) {
+      chosenQuote = matchingShared[Math.floor(Math.random() * matchingShared.length)];
+      selectedFromCommunity = true;
+    } else if (sharedPool.length > 0) {
+      // fallback to any community quote if no direct match under selected tags
+      chosenQuote = sharedPool[Math.floor(Math.random() * sharedPool.length)];
+      selectedFromCommunity = true;
+    }
+  } else if (selectedSource === "both" && matchingShared.length > 0) {
+    // 35% chance to show a high-quality community quote if it matches the current focus
+    if (Math.random() < 0.35) {
+      chosenQuote = matchingShared[Math.floor(Math.random() * matchingShared.length)];
+      selectedFromCommunity = true;
+    }
+  }
+
+  if (selectedFromCommunity && chosenQuote) {
+    return res.json({
+      ...chosenQuote,
+      id: `shared-gen-${chosenQuote.id}-${Date.now()}`,
+      timestamp: Date.now(),
+      generatedBy: "Community Shared"
+    });
+  }
+
+  // 2. Generate with AI model if requested or if community select was skipped
   const ai = getGeminiClient();
 
-  if (ai) {
-    const modelsToTry = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  if (ai && selectedSource !== "community") {
+    const modelsToTry = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
     
     for (const modelName of modelsToTry) {
       try {
@@ -109,7 +204,7 @@ app.post("/api/generate-quote", async (req, res) => {
     }
   }
 
-  // Fallback if Gemini isn't configured, or fails
+  // 3. Fallback if Gemini isn't configured, fails, or community source is empty
   const matchedQuotes = fallbackQuotes.filter(
     (q) => q.category === selectedCategory || q.mood === selectedMood
   );

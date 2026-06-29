@@ -58,6 +58,7 @@ export default function App() {
   const [customApiHost, setCustomApiHost] = useState('');
 
   // Custom Creator fields
+  const [quoteSource, setQuoteSource] = useState<'both' | 'ai' | 'community'>('both');
   const [customText, setCustomText] = useState('');
   const [customAuthor, setCustomAuthor] = useState('');
   const [customCategory, setCustomCategory] = useState<CategoryType>('general');
@@ -70,11 +71,18 @@ export default function App() {
   // Set default active quote on mount
   useEffect(() => {
     if (fallbackQuotes.length > 0 && !currentQuote) {
+      const initialQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
       setCurrentQuote({
-        ...fallbackQuotes[0],
-        id: 'initial',
+        ...initialQuote,
+        id: `fb-init-${Date.now()}`,
         timestamp: Date.now()
       });
+      if (initialQuote.mood) {
+        setSelectedMood(initialQuote.mood as MoodType);
+      }
+      if (initialQuote.category) {
+        setSelectedCategory(initialQuote.category as CategoryType);
+      }
     }
   }, []);
 
@@ -160,6 +168,54 @@ export default function App() {
     }
   };
 
+  // Find a quote from fallbackQuotes that matches mood and category as best as possible
+  const findMatchingQuote = (mood: MoodType, category: CategoryType) => {
+    const sourcePool = fallbackQuotes;
+    
+    // First try: exact match of both mood and category
+    let matched = sourcePool.filter(q => q.mood === mood && q.category === category);
+    if (matched.length > 0) return matched[Math.floor(Math.random() * matched.length)];
+    
+    // Second try: match just category
+    matched = sourcePool.filter(q => q.category === category);
+    if (matched.length > 0) return matched[Math.floor(Math.random() * matched.length)];
+    
+    // Third try: match just mood
+    matched = sourcePool.filter(q => q.mood === mood);
+    if (matched.length > 0) return matched[Math.floor(Math.random() * matched.length)];
+    
+    // Fourth try: random quote from pool
+    return sourcePool[Math.floor(Math.random() * sourcePool.length)];
+  };
+
+  const handleMoodChange = (newMood: MoodType) => {
+    setSelectedMood(newMood);
+    const quote = findMatchingQuote(newMood, selectedCategory);
+    if (quote) {
+      setCurrentQuote({
+        ...quote,
+        id: quote.id.startsWith('fb-') ? `fb-sync-${Date.now()}` : quote.id,
+        mood: newMood,
+        category: selectedCategory,
+        timestamp: Date.now()
+      });
+    }
+  };
+
+  const handleCategoryChange = (newCategory: CategoryType) => {
+    setSelectedCategory(newCategory);
+    const quote = findMatchingQuote(selectedMood, newCategory);
+    if (quote) {
+      setCurrentQuote({
+        ...quote,
+        id: quote.id.startsWith('fb-') ? `fb-sync-${Date.now()}` : quote.id,
+        mood: selectedMood,
+        category: newCategory,
+        timestamp: Date.now()
+      });
+    }
+  };
+
   // Async Quote Generator (AI live with offline fallback database)
   const generateNewQuote = async () => {
     setIsLoading(true);
@@ -174,7 +230,8 @@ export default function App() {
         body: JSON.stringify({
           category: selectedCategory,
           mood: selectedMood,
-          customTopic: customTopic
+          customTopic: customTopic,
+          source: quoteSource
         })
       });
 
@@ -286,11 +343,28 @@ export default function App() {
     setSavedQuotes(updatedSaved);
     await AsyncStorage.setItem('pocket_motivation_saved_library', JSON.stringify(updatedSaved));
 
+    // Save to shared public pool on server
+    try {
+      const activeHost = customApiHost.trim() || API_HOST;
+      await fetch(`${activeHost}/api/save-custom-quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: customQuote.text,
+          author: customQuote.author,
+          category: customQuote.category,
+          mood: selectedMood || 'general',
+          explanation: 'Shared wisdom from a fellow traveller.'
+        })
+      });
+    } catch (err) {
+      console.warn('Failed to share custom quote to public community pool:', err);
+    }
+
     // Reset Form
     setCustomText('');
     setCustomAuthor('');
-    triggerToast('Custom quote saved.');
-    setActiveTab('library');
+    triggerToast('Custom quote saved and shared with community.');
   };
 
   // Advanced Connection host setup
@@ -563,6 +637,31 @@ export default function App() {
                   style={styles.topicInput}
                 />
               </View>
+
+              {/* Wisdom Source Selection */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>WISDOM SOURCE</Text>
+                <View style={styles.sourceSelectorContainer}>
+                  <TouchableOpacity 
+                    onPress={() => setQuoteSource('both')}
+                    style={[styles.sourceBtn, quoteSource === 'both' && styles.sourceBtnActive]}
+                  >
+                    <Text style={[styles.sourceBtnText, quoteSource === 'both' && styles.sourceBtnTextActive]}>COMBINED</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => setQuoteSource('ai')}
+                    style={[styles.sourceBtn, quoteSource === 'ai' && styles.sourceBtnActive]}
+                  >
+                    <Text style={[styles.sourceBtnText, quoteSource === 'ai' && styles.sourceBtnTextActive]}>AI COACH</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => setQuoteSource('community')}
+                    style={[styles.sourceBtn, quoteSource === 'community' && styles.sourceBtnActive]}
+                  >
+                    <Text style={[styles.sourceBtnText, quoteSource === 'community' && styles.sourceBtnTextActive]}>COMMUNITY</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
 
             {/* Action Buttons */}
@@ -750,7 +849,7 @@ export default function App() {
                 activeOpacity={0.9}
               >
                 <Plus color="#FCFAF3" size={16} style={styles.btnIconSpacing} />
-                <Text style={styles.primaryActionButtonText}>ADD TO MY LIBRARY</Text>
+                <Text style={styles.primaryActionButtonText}>ADD TO MY LIBRARY & PUBLISH</Text>
               </TouchableOpacity>
             </View>
 
@@ -1327,6 +1426,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 11,
     color: '#2D2824',
+  },
+  sourceSelectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FCFAF3',
+    borderColor: '#E6DEC9',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 3,
+    justifyContent: 'space-between',
+  },
+  sourceBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sourceBtnActive: {
+    backgroundColor: '#8F2A19',
+  },
+  sourceBtnText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#615A52',
+  },
+  sourceBtnTextActive: {
+    color: '#FCFAF3',
   },
 
   // Form styles
